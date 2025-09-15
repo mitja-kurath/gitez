@@ -1,0 +1,35 @@
+{
+  "name": "gitez",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "dev": "pnpm -r -F packages/cli run dev",
+    "test": "pnpm -r run test",
+    "lint": "echo \"add eslint later\"",
+    "format": "echo \"add prettier later\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.16.1",
+  "devDependencies": {
+    "@types/node": "^24.4.0",
+    "@types/react": "^19.1.13",
+    "eslint": "^9.35.0",
+    "prettier": "^3.6.2",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "clipanion": "4.0.0-rc.4",
+    "cosmiconfig": "^9.0.0",
+    "execa": "^9.6.0"
+  }
+}
