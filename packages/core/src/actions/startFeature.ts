@@ -23,14 +23,11 @@ export async function startFeature(
   }
   const branchName = `${config.branchPrefix}/${cleanName}`;
 
-  const preview: string[] = [
-    `Ensure clean working tree`,
-    `Fetch origin`,
-    `Checkout ${base}`,
-    `Create and switch to ${branchName}`,
-    `Set upstream to origin/${branchName}`
-  ];
+  // Pre-flight checks to build a smarter plan
+  const remoteExists = await vcs.hasRemote(cwd, "origin");
+  const baseBranchExists = await vcs.hasBranch(cwd, base);
 
+  const preview: string[] = [`Ensure clean working tree`];
   const steps: ActionStep[] = [
     {
       title: "Validate clean tree",
@@ -41,19 +38,39 @@ export async function startFeature(
           );
         }
       }
-    },
-    { title: "Fetch origin", run: async () => vcs.fetch(cwd) },
-    { title: `Checkout ${base}`, run: async () => vcs.checkout(cwd, base, false) },
-    {
-      title: `Create ${branchName}`,
-      run: async () => vcs.checkout(cwd, branchName, true),
-      undo: async () => vcs.checkout(cwd, base, false)
-    },
-    {
-      title: "Set upstream",
-      run: async () => vcs.setUpstream(cwd, branchName, `origin/${branchName}`)
     }
   ];
+
+  if (remoteExists) {
+    preview.push(`Fetch origin`);
+    steps.push({ title: "Fetch origin", run: async () => vcs.fetch(cwd) });
+  }
+
+  if (baseBranchExists) {
+    preview.push(`Checkout ${base}`);
+    steps.push({
+      title: `Checkout ${base}`,
+      run: async () => vcs.checkout(cwd, base, false)
+    });
+  }
+
+  preview.push(`Create and switch to ${branchName}`);
+  steps.push({
+    title: `Create ${branchName}`,
+    run: async () => vcs.checkout(cwd, branchName, true),
+    // If checkout fails, we want to go back to the base branch if it was there
+    undo: async () => {
+      if (baseBranchExists) await vcs.checkout(cwd, base, false);
+    }
+  });
+
+  if (remoteExists) {
+    preview.push(`Set upstream to origin/${branchName}`);
+    steps.push({
+      title: "Set upstream",
+      run: async () => vcs.setUpstream(cwd, branchName, `origin/${branchName}`)
+    });
+  }
 
   const execute = async () => {
     for (const step of steps) await step.run(ctx);
