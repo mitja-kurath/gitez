@@ -4,15 +4,20 @@ import type { VCS } from "@gitez/core";
 async function runGit(
   cwd: string,
   args: string[],
-  opts?: { timeoutMs?: number }
+  opts?: { timeoutMs?: number; ignoreError?: boolean }
 ): Promise<string> {
-  const { timeoutMs = 60_000 } = opts ?? {};
-  const { stdout } = await execa("git", args, {
-    cwd,
-    timeout: timeoutMs,
-    windowsHide: true
-  });
-  return (stdout ?? "").toString().trim();
+  const { timeoutMs = 60_000, ignoreError = false } = opts ?? {};
+  try {
+    const { stdout } = await execa("git", args, {
+      cwd,
+      timeout: timeoutMs,
+      windowsHide: true
+    });
+    return (stdout ?? "").toString().trim();
+  } catch (e) {
+    if (ignoreError) return "";
+    throw e;
+  }
 }
 
 export const GitAdapter: VCS = {
@@ -24,7 +29,11 @@ export const GitAdapter: VCS = {
     await runGit(cwd, ["fetch", "--prune"]);
   },
 
-  async checkout(cwd: string, branch: string, create: boolean = false): Promise<void> {
+  async checkout(
+    cwd: string,
+    branch: string,
+    create: boolean = false
+  ): Promise<void> {
     if (create) {
       await runGit(cwd, ["checkout", "-b", branch]);
     } else {
@@ -39,14 +48,31 @@ export const GitAdapter: VCS = {
   async isClean(cwd: string): Promise<boolean> {
     const out = await runGit(cwd, ["status", "--porcelain"]);
     return out.length === 0;
-    // Alternatively, you can use --porcelain=v1 -z for robust parsing later
   },
 
-  async setUpstream(cwd: string, branch: string, upstream: string): Promise<void> {
+  async setUpstream(
+    cwd: string,
+    branch: string,
+    upstream: string
+  ): Promise<void> {
     try {
       await runGit(cwd, ["push", "-u", "origin", branch]);
     } catch {
+      // Fallback for older git versions or different configs
       await runGit(cwd, ["branch", "--set-upstream-to", upstream, branch]);
     }
+  },
+
+  async hasRemote(cwd: string, name: string): Promise<boolean> {
+    const out = await runGit(cwd, ["remote"]);
+    return out.split("\n").includes(name);
+  },
+
+  async hasBranch(cwd: string, name: string): Promise<boolean> {
+    // Use --list to check. It returns the branch name if it exists, or empty if not.
+    const out = await runGit(cwd, ["branch", "--list", name], {
+      ignoreError: true
+    });
+    return out.trim().length > 0;
   }
 };
